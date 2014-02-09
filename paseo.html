@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>EaselJS: Ejemplo paseo</title>
+	<script src="http://code.createjs.com/easeljs-0.7.1.min.js"></script>
+	<script type="text/javascript">
+	var stage, w, h, loader;
+	var enemy, zz_count=0, stop=false;
+(function (window) {
+	function Actor(stage,guion, imgMonster) {
+		this.initialize(stage,guion, imgMonster);
+	};
+	Actor.prototype = new createjs.Sprite();
+    // constructor and herencia.
+    Actor.prototype.Sprite_initialize = Enemy.prototype.initialize;    
+
+    Actor.prototype.initialize = function (stage,guion, imgMonster) {
+		var localSpriteSheet = new createjs.SpriteSheet({
+            images: [imgMonster], //image to use
+            frames: { width: 64, height: 64, regX: 32, regY: 64 },
+            animations: {
+                walk: [0, 9, "walk", 0,5],
+                idle: [10, 20, "idle", 1]
+            }
+        });
+        this.guion = guion;
+        this.estado = 0;
+        this.actuacion = this.guion[this.estado];
+        this.stage = stage;
+        this.enemyW = enemyW = enemy.getBounds().width*enemy.scaleX;
+		this.Sprite_initialize(localSpriteSheet,this.actuacion.tipo);
+		if (this.actuacion.posicion) {
+			enemy.setTransform(this.actuacion.posicion.x,this.actuacion.posicion.y);
+		}
+		this.stage.addChild(this);
+		createjs.Ticker.addEventListener("tick", this.tick);
+	};
+	Actor.prototype.tick = function (event) {
+		zz_count++;
+		if ( zz_count == 1000 ) {
+			createjs.Ticker.off("tick",this.tick);
+			log("Out");
+			return;
+		}
+		if (stop ) {
+			this.stage.update(event);
+			return;
+		}
+		var deltaS = event.delta/1000;
+		var position = enemy.x-18*2*deltaS; // 18 pixels por zancada * 3 zancadas por segungo =(aprox) ancho enemy.
+		log("deltaS:"+deltaS+"*X:"+enemy.x+"*Pos:"+position+"*W="+w+"*"+enemyW+"*Current:"+enemy.currentFrame);
+		if ( position <= this.enemyW ) {
+			this.x = position;
+			this.gotoAndPlay("idle");
+			stop = true;
+		} else {
+			this.x = position;
+		}
+		this.stage.update(event);
+	}
+	window.Actor = Actor;
+} (window));
+
+	function init() {
+		stage = new createjs.Stage("testCanvas");
+		
+		// grab canvas width and height for later calculations:
+		w = stage.canvas.width;
+		h = stage.canvas.height;
+		run()
+	}
+	function run() {
+		//sky = new createjs.Shape();
+		//sky.graphics.beginBitmapFill(loader.getResult("sky")).drawRect(0,0,w,h);
+		enemy_data = new createjs.SpriteSheet({
+			framerate: 20,
+            images: ["img/MonsterA.png"], //image to use
+            frames: { width: 64, height: 64, regX: 32, regY: 64 },
+            animations: {
+                walk: [0, 9, "walk",0.50],
+                idle: [10, 20, "idle", 1]
+            }
+        });
+        enemy = new createjs.Sprite(enemy_data, "walk");
+        enemy.setTransform(w, h);
+		stage.addChild(enemy);
+		createjs.Ticker.timingMode = createjs.Ticker.RAF;
+		createjs.Ticker.addEventListener("tick", tick);
+	}
+	function tick(event) {
+		zz_count++;
+		if ( zz_count == 1000 ) {
+			createjs.Ticker.off("tick",tick);
+			log("Out");
+			return;
+		}
+		if (stop ) {
+			stage.update(event);
+			return;
+		}
+		var enemyW = enemy.getBounds().width*enemy.scaleX;
+		var deltaS = event.delta/1000;
+		var position = enemy.x-18*2*deltaS; // 18 pixels por zancada * 3 zancadas por segungo =(aprox) ancho enemy.
+		log("deltaS:"+deltaS+"*X:"+enemy.x+"*Pos:"+position+"*W="+w+"*"+enemyW+"*Current:"+enemy.currentFrame);
+		if ( position <= enemyW ) {
+			enemy.x = position;
+			enemy.gotoAndPlay("idle");
+			stop = true;
+		} else {
+			enemy.x = position;
+		}
+		//enemy.x = (position >= w) ? -grantW : position;	
+		stage.update(event);
+	}
+// Utilities
+	function $(id){ return document.getElementById(id); }	
+	function log(msg){ var p = $("log"); p.innerHTML =msg+ "<br/>" + p.innerHTML; }
+	</script>
+</head>
+<body onload="init();">
+
+	<div id="loader" class="loader"></div>
+	HOLA
+	<div class="canvasHolder">
+		<canvas id="testCanvas" width="960" height="400" style="background-color: #FFFF00;"></canvas>
+	</div>
+<br/><br/>
+Log: (First is last)<div id="log" style="border-top: 1px solid #ccc" ></div>
+
+
+</body>
+</html>
+

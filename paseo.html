@@ -1,62 +1,87 @@
 <!DOCTYPE html>
 <html>
 <head>
+	<meta charset="utf-8">
 	<title>EaselJS: Ejemplo paseo</title>
 	<script src="http://code.createjs.com/easeljs-0.7.1.min.js"></script>
 	<script type="text/javascript">
 	var stage, w, h, loader;
-	var enemy, zz_count=0, stop=false;
+	var actores = [], zz_count=0, margenActor=0, personajes = ["A","B","C","D"], iper = 0;
 (function (window) {
+	var monstruos = 0;
 	function Actor(stage,guion, imgMonster) {
 		this.initialize(stage,guion, imgMonster);
 	};
 	Actor.prototype = new createjs.Sprite();
     // constructor and herencia.
-    Actor.prototype.Sprite_initialize = Enemy.prototype.initialize;    
+    Actor.prototype.Sprite_initialize = Actor.prototype.initialize;    
 
     Actor.prototype.initialize = function (stage,guion, imgMonster) {
+		this.velocidad = guion[0].velocidad;
 		var localSpriteSheet = new createjs.SpriteSheet({
+			framerate: 20,
             images: [imgMonster], //image to use
             frames: { width: 64, height: 64, regX: 32, regY: 64 },
             animations: {
-                walk: [0, 9, "walk", 0,5],
+                walk: [0, 9, "walk", this.velocidad[0]],
                 idle: [10, 20, "idle", 1]
             }
         });
+        this.bucle = 0;
         this.guion = guion;
-        this.estado = 0;
-        this.actuacion = this.guion[this.estado];
         this.stage = stage;
-        this.enemyW = enemyW = enemy.getBounds().width*enemy.scaleX;
+		this.firtsActuacion();        
 		this.Sprite_initialize(localSpriteSheet,this.actuacion.tipo);
-		if (this.actuacion.posicion) {
-			enemy.setTransform(this.actuacion.posicion.x,this.actuacion.posicion.y);
-		}
 		this.stage.addChild(this);
-		createjs.Ticker.addEventListener("tick", this.tick);
+		//this.enemyW = this.getBounds().width*this.scaleX;
+		this.name = "Moustruo_"+monstruos++;
 	};
-	Actor.prototype.tick = function (event) {
-		zz_count++;
-		if ( zz_count == 1000 ) {
-			createjs.Ticker.off("tick",this.tick);
-			log("Out");
-			return;
+	Actor.prototype.firtsActuacion = function () {
+		if (++this.bucle > 2 ) {
+			this.activo = false;
+			return this.activo;
 		}
-		if (stop ) {
-			this.stage.update(event);
+		this.estado = 0;
+		this.activo = true;
+		this.actuacion = this.guion[this.estado];
+		if (this.actuacion.posInicio) {
+			this.setTransform(this.actuacion.posInicio.x,this.actuacion.posInicio.y);
+		}
+		log(this.name+": Primero: tipo:"+this.actuacion.tipo+"*paso:"+this.estado);
+		return this.activo;
+	};
+	Actor.prototype.nextActuacion = function () {
+		this.estado += 1;
+		if (this.guion.length > this.estado ) {
+			this.actuacion = this.guion[this.estado];
+			this.gotoAndPlay(this.actuacion.tipo);
+			if (this.actuacion.tiempo) {
+				this.actuacion.tiempoRestante = this.actuacion.tiempo;
+			}
+			log(this.name+": tipo:"+this.actuacion.tipo+"*paso:"+this.estado);
+		} else {
+			this.activo = false;
+		}
+	}; 
+	Actor.prototype.tick = function (event) {
+		if (! this.activo ) {
+			log("Activo?:"+this.activo);
 			return;
 		}
 		var deltaS = event.delta/1000;
-		var position = enemy.x-18*2*deltaS; // 18 pixels por zancada * 3 zancadas por segungo =(aprox) ancho enemy.
-		log("deltaS:"+deltaS+"*X:"+enemy.x+"*Pos:"+position+"*W="+w+"*"+enemyW+"*Current:"+enemy.currentFrame);
-		if ( position <= this.enemyW ) {
+		var position = this.x-18*this.velocidad[1]*deltaS; // 18 pixels por zancada * 3 zancadas por segungo =(aprox) ancho enemy.
+		//log("deltaS:"+deltaS+"*X:"+this.x+"*Pos:"+position);
+		if ( this.actuacion.tipo == "walk") {
 			this.x = position;
-			this.gotoAndPlay("idle");
-			stop = true;
-		} else {
-			this.x = position;
+			if ( this.actuacion.posFinal.x >= position ) {
+				this.nextActuacion();
+			}
+		} else if (this.actuacion.tipo == "idle" ) {
+			this.actuacion.tiempoRestante -= event.delta;
+			if ( this.actuacion.tiempoRestante <= 0 ) {
+				this.nextActuacion();
+			}
 		}
-		this.stage.update(event);
 	}
 	window.Actor = Actor;
 } (window));
@@ -67,49 +92,55 @@
 		// grab canvas width and height for later calculations:
 		w = stage.canvas.width;
 		h = stage.canvas.height;
-		run()
-	}
-	function run() {
-		//sky = new createjs.Shape();
-		//sky.graphics.beginBitmapFill(loader.getResult("sky")).drawRect(0,0,w,h);
-		enemy_data = new createjs.SpriteSheet({
-			framerate: 20,
-            images: ["img/MonsterA.png"], //image to use
-            frames: { width: 64, height: 64, regX: 32, regY: 64 },
-            animations: {
-                walk: [0, 9, "walk",0.50],
-                idle: [10, 20, "idle", 1]
-            }
-        });
-        enemy = new createjs.Sprite(enemy_data, "walk");
-        enemy.setTransform(w, h);
-		stage.addChild(enemy);
+		// Fondo y frontal
+		//var bitmap = new createjs.Bitmap("img/dat_dyno.jpg");
+		//stage.addChild(bitmap);
+		//stage.addChild(new createjs.Shape()).setTransform(100,100).graphics.f("red").dc(0,0,50);
 		createjs.Ticker.timingMode = createjs.Ticker.RAF;
+		guion = [
+			{ tipo: "walk", posInicio : { x : w, y : h},posFinal: {x :w/2, y: h}, velocidad: [0.5,3]}
+			,{ tipo: "idle", tiempo : 3000 }
+			,{ tipo: "walk", posFinal: {x : -64, y: h} }
+		]
+		actores.push(new Actor(stage,guion,"img/MonsterA.png") );
 		createjs.Ticker.addEventListener("tick", tick);
+		setTimeout(nuevo, 2000 * Math.floor((Math.random()*10)+1) );
+	}
+	function nuevo() {
+		var r = Math.floor((Math.random()*4) + 1)+Math.random();
+		var guion = [
+			{ tipo: "walk", posInicio : { x : w, y : h},posFinal: {x :w/r, y: h}, }
+			,{ tipo: "idle", tiempo : 3000 }
+			,{ tipo: "walk", posFinal: {x : -64, y: h} }
+		]
+		var velocidad = Math.round(Math.random()*5)+2 
+		guion[0].velocidad = [ velocidad / 3, velocidad]
+		iper = (iper + 1) % 4;
+		log("iper:"+iper+"velocidad"+velocidad+"*"+"img/Monster"+personajes[iper]+"*r:"+r);
+		actores.push(new Actor(stage,guion,"img/Monster"+personajes[iper]+".png") );
+		if (actores.length < 10 ) {
+			setTimeout(nuevo, 1000 * (Math.floor((Math.random()*10)+1) ) );
+		}
 	}
 	function tick(event) {
-		zz_count++;
-		if ( zz_count == 1000 ) {
+		var tot = actores.length;
+		var activos = 0;
+		while (--tot >= 0) {
+			if (actores[tot].activo ) { 
+				activos++
+				actores[tot].tick(event);
+			} else {
+				if ( actores[tot].firtsActuacion() ) {
+					actores[tot].tick(event); 
+					activos++;
+				}
+			}
+		}
+		if ( ! activos )  {
 			createjs.Ticker.off("tick",tick);
 			log("Out");
 			return;
 		}
-		if (stop ) {
-			stage.update(event);
-			return;
-		}
-		var enemyW = enemy.getBounds().width*enemy.scaleX;
-		var deltaS = event.delta/1000;
-		var position = enemy.x-18*2*deltaS; // 18 pixels por zancada * 3 zancadas por segungo =(aprox) ancho enemy.
-		log("deltaS:"+deltaS+"*X:"+enemy.x+"*Pos:"+position+"*W="+w+"*"+enemyW+"*Current:"+enemy.currentFrame);
-		if ( position <= enemyW ) {
-			enemy.x = position;
-			enemy.gotoAndPlay("idle");
-			stop = true;
-		} else {
-			enemy.x = position;
-		}
-		//enemy.x = (position >= w) ? -grantW : position;	
 		stage.update(event);
 	}
 // Utilities
@@ -120,10 +151,11 @@
 <body onload="init();">
 
 	<div id="loader" class="loader"></div>
-	HOLA
+	<h1>La ruta del coresterol</h1>
 	<div class="canvasHolder">
-		<canvas id="testCanvas" width="960" height="400" style="background-color: #FFFF00;"></canvas>
+		<canvas id="testCanvas" width="960" height="100" style="background-color: #FFFF00;"></canvas>
 	</div>
+	<p>Es una prueba de la librería para canvas <a href="http://createjs.com">EaselJS</a>. Los sprites animados son del proyecto. Microsoft XNA Community Game Platformer Sample en la versión de David Rousset - <a href="http://blogs.msdn.com/davrous">blogs.msdn.com/davrous</a></p>
 <br/><br/>
 Log: (First is last)<div id="log" style="border-top: 1px solid #ccc" ></div>
 

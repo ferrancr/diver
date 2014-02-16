@@ -2,21 +2,69 @@
 <html>
 <head>
 	<meta charset="utf-8">
-	<title>EaselJS: Ejemplo paseo</title>
+	<title>EaselJS: Ejemplo: paseo de los monstruos</title>
+	<style type="text/css">
+a:link, a:visited {
+    color: #111111;
+    text-decoration: none;
+}
+a:hover {
+    color: #FF7788;
+    text-decoration: underline;
+}
+
+#titular {
+	padding-bottom:1em;
+
+}
+h1 {
+	font-family: Arial,Helvetica,sans-serif;
+	padding-bottom:0;
+	margin: 0;
+	color: #555;
+	text-transform: uppercase;
+}
+ p {
+	font-size: 1.2em;
+    margin-top: 0;
+    color: #777777;
+}
+.container {
+    margin: 0 auto;
+    max-width: 1010px;
+    padding: 0 30px 30px;
+	background: none repeat scroll 0 0 #EEEEEE;
+}
+.features {
+    padding: 30px 0;
+}
+.column {
+    display: block;
+    float: left;
+    margin-right: 5%;
+    width: 28%;
+    font-family: Arial,Helvetica,sans-serif;
+    color: #777777;
+}
+#develop {
+	clear: both;
+	margin: 2em 0;
+}
+	</style>
 	<script src="http://code.createjs.com/easeljs-0.7.1.min.js"></script>
 	<script type="text/javascript">
-	var stage, w, h, loader;
-	var actores = [], zz_count=0, margenActor=0, personajes = ["A","B","C","D"], iper = 0;
+	var stage, w, h, contentManager,bitmapF;
+	var actores = [], totalActores=10,zz_count=0, margenActor=0, iper = 0;
 (function (window) {
 	var monstruos = 0;
-	function Actor(stage,guion, imgMonster) {
-		this.initialize(stage,guion, imgMonster);
+	function Actor(stage,guion, imgMonster,frontal) {
+		this.initialize(stage,guion, imgMonster,frontal);
 	};
 	Actor.prototype = new createjs.Sprite();
     // constructor and herencia.
     Actor.prototype.Sprite_initialize = Actor.prototype.initialize;    
 
-    Actor.prototype.initialize = function (stage,guion, imgMonster) {
+    Actor.prototype.initialize = function (stage,guion, imgMonster,frontal) {
 		this.velocidad = guion[0].velocidad;
 		var localSpriteSheet = new createjs.SpriteSheet({
 			framerate: 20,
@@ -30,14 +78,17 @@
         this.bucle = 0;
         this.guion = guion;
         this.stage = stage;
+        this.activo = false;
 		this.firtsActuacion();        
 		this.Sprite_initialize(localSpriteSheet,this.actuacion.tipo);
-		this.stage.addChild(this);
+		var zz = this.stage.getChildIndex(frontal);
+		this.stage.addChildAt(this,zz);
 		//this.enemyW = this.getBounds().width*this.scaleX;
-		this.name = "Moustruo_"+monstruos++;
+		this.name = "Monstruo_"+monstruos++;
 	};
 	Actor.prototype.firtsActuacion = function () {
-		if (++this.bucle > 2 ) {
+		if (++this.bucle > 3 ) {
+			//this.gotoAndStop(this.spriteSheet.animations.idle[0])
 			this.activo = false;
 			return this.activo;
 		}
@@ -85,41 +136,147 @@
 	}
 	window.Actor = Actor;
 } (window));
+(function (window) {
+	var elCanvas, paseoY,paseoXI,paseoXF;
+	function setRangoGuion(element) {
+		elCanvas = $(element);
+		paseoY = parseInt(elCanvas.getAttribute('paseowy'));
+		paseoXI = parseInt(elCanvas.getAttribute('paseowxi'));
+		paseoXF = parseInt(elCanvas.getAttribute('paseowxf'));
+		log("rango:"+paseoY+"*"+paseoXI+"*"+paseoXF+"*"+(paseoXI - paseoXF)/2+"*"+((paseoXI - paseoXF)/2+paseoXF)+"*");
+	}
+	function Guion() {
+		this.guion = [
+			{ tipo: "walk", posInicio : { x : paseoXI, y : paseoY},posFinal: {x :((paseoXI-paseoXF)/2)+paseoXF, y: paseoY}, velocidad: [0.5,3]}
+			,{ tipo: "idle", tiempo : 3000 }
+			,{ tipo: "walk", posFinal: {x : paseoXF, y: paseoY} }
+		]
+	}
+	Guion.prototype.getAlterGuion = function(r,velocidad) {
+		log("Parada:"+this.guion[0].posFinal.x+"Cal:"+Math.round( ( paseoXI - paseoXF  )/ r +  paseoXF) +"*");
+		this.guion[0].posFinal.x = Math.round( ( paseoXI - paseoXF  )/ r + paseoXF) ;
+		this.guion[0].velocidad = [ velocidad / 6, velocidad];
+		return this.guion;
+	}
+	window.Guion = Guion;
+	window.setRangoGuion = setRangoGuion;
+} (window));
 
+function ContentManager(stage,w,h,back,front,players) {
+    // Method called back once all elements
+    // have been downloaded
+    var ondownloadcompleted;
+    // Number of elements to download
+    var NUM_ELEMENTS_TO_DOWNLOAD = 2+players.length;
+    var numElementsLoaded = 0;
+	var downloadProgress;
+	this.imgBack = new Image();
+	this.imgFront = new Image();
+	this.imgPlayers = new Array();
+	var l = players.length;
+	for (var i =0; i < l; i++) {
+		this.imgPlayers[i] = new Image();
+	}
+	
+	this.StartDownload = function () {
+        downloadProgress = new Text("-- %", "bold 14px Arial", "#FFF");
+        downloadProgress.x = (w / 2) - 50;
+        downloadProgress.y = h / 2;
+        stage.addChild(downloadProgress);
+        SetDownloadParameters(this.imgBack, back);
+        SetDownloadParameters(this.imgFront, front);
+        for (var i=0; i < l; i++ ) {
+			SetDownloadParameters(this.imgPlayers[i], players[i]);
+		}
+		createjs.Ticker.addEventListener('tick',this.tick);
+		createjs.Ticker.setInterval(50);
+	};
+	
+    // setting the callback method
+    // Triggered once everything is ready to be drawned on the canvas
+    this.SetDownloadCompleted = function (callbackMethod) {
+        ondownloadcompleted = callbackMethod;
+    };
+    
+    // Update methid which simply shows the current % of download
+    this.tick = function() {
+        downloadProgress.text = "Downloading " + Math.round((numElementsLoaded / NUM_ELEMENTS_TO_DOWNLOAD) * 100) + " %";
+        // update the stage:
+        stage.update();
+    };
+    
+    //---- Inner Fuctions.
+    // Set parameters for Donwload.
+    function SetDownloadParameters(assetElement, url) {
+        assetElement.src = url;
+        assetElement.onload = handleElementLoad;
+        assetElement.onerror = handleElementError;
+    };
+
+    // our global handler 
+    function handleElementLoad(e) {
+        numElementsLoaded++;
+
+        // If all elements have been downloaded
+        if (numElementsLoaded === NUM_ELEMENTS_TO_DOWNLOAD) {
+            stage.removeChild(downloadProgress);
+            createjs.Ticker.removeAllEventListeners();
+            numElementsLoaded = 0;
+            // we're calling back the method set by SetDownloadCompleted
+            ondownloadcompleted();
+        }
+    }
+
+    //called if there is an error loading the image (usually due to a 404)
+    function handleElementError(e) {
+        log("Error Loading Asset : " + e.target.src);
+    }
+
+}
+// --- Proceso
 	function init() {
 		stage = new createjs.Stage("testCanvas");
 		
 		// grab canvas width and height for later calculations:
 		w = stage.canvas.width;
 		h = stage.canvas.height;
+		var back = "img/dat_dyno2.jpg";
+		var front = "img/dat_dyno_frontal.png";
+		var players = [
+			"img/MonsterA.png",
+			"img/MonsterB.png",
+			"img/MonsterC.png",
+			"img/MonsterD.png",
+		];
+		contentManager = new ContentManager(stage,w,h,back,front,players);
+		contentManager.StartDownload();
+		contentManager.SetDownloadCompleted(accion);
+	}
+	function accion() {
 		// Fondo y frontal
-		//var bitmap = new createjs.Bitmap("img/dat_dyno.jpg");
-		//stage.addChild(bitmap);
-		//stage.addChild(new createjs.Shape()).setTransform(100,100).graphics.f("red").dc(0,0,50);
+		var bitmap = new createjs.Bitmap(contentManager.imgBack);
+		stage.addChild(bitmap);
+		bitmapF = new createjs.Bitmap(contentManager.imgFront);
+		bitmapF.setTransform(220,391);
+		stage.addChild(bitmapF);
 		createjs.Ticker.timingMode = createjs.Ticker.RAF;
-		guion = [
-			{ tipo: "walk", posInicio : { x : w, y : h},posFinal: {x :w/2, y: h}, velocidad: [0.5,3]}
-			,{ tipo: "idle", tiempo : 3000 }
-			,{ tipo: "walk", posFinal: {x : -64, y: h} }
-		]
-		actores.push(new Actor(stage,guion,"img/MonsterA.png") );
+		setRangoGuion("testCanvas");
+		var guion = new Guion();
+		actores.push(new Actor(stage,guion.getAlterGuion(2,3),contentManager.imgPlayers[0],bitmapF) );
 		createjs.Ticker.addEventListener("tick", tick);
 		setTimeout(nuevo, 2000 * Math.floor((Math.random()*10)+1) );
 	}
+
 	function nuevo() {
 		var r = Math.floor((Math.random()*4) + 1)+Math.random();
-		var guion = [
-			{ tipo: "walk", posInicio : { x : w, y : h},posFinal: {x :w/r, y: h}, }
-			,{ tipo: "idle", tiempo : 3000 }
-			,{ tipo: "walk", posFinal: {x : -64, y: h} }
-		]
 		var velocidad = Math.round(Math.random()*5)+2 
-		guion[0].velocidad = [ velocidad / 3, velocidad]
 		iper = (iper + 1) % 4;
-		log("iper:"+iper+"velocidad"+velocidad+"*"+"img/Monster"+personajes[iper]+"*r:"+r);
-		actores.push(new Actor(stage,guion,"img/Monster"+personajes[iper]+".png") );
-		if (actores.length < 10 ) {
-			setTimeout(nuevo, 1000 * (Math.floor((Math.random()*10)+1) ) );
+		var guion = new Guion();
+		log("iper:"+iper+"velocidad"+velocidad+"*"+contentManager.imgPlayers[iper].src+"*r:"+r);
+		var act = new Actor(stage,guion.getAlterGuion(r,velocidad),contentManager.imgPlayers[iper],bitmapF); 
+		actores.push(act);
+		if (actores.length < totalActores ) {
+			setTimeout(nuevo, 1000 * (Math.floor((Math.random()*10)+3) ) );
 		}
 	}
 	function tick(event) {
@@ -130,7 +287,7 @@
 				activos++
 				actores[tot].tick(event);
 			} else {
-				if ( actores[tot].firtsActuacion() ) {
+				if (actores[tot].firtsActuacion() ) {
 					actores[tot].tick(event); 
 					activos++;
 				}
@@ -149,16 +306,34 @@
 	</script>
 </head>
 <body onload="init();">
-
-	<div id="loader" class="loader"></div>
-	<h1>La ruta del coresterol</h1>
-	<div class="canvasHolder">
-		<canvas id="testCanvas" width="960" height="100" style="background-color: #FFFF00;"></canvas>
+<div class="container">
+	<div it="titular">
+		<h1>La ruta del colesterol</h1>
+		<p>O como los monstruos decidieron bajar sus altos niveles de colesterol debido a los malos hábitos alimenticios de sus víctimas.</p>
 	</div>
-	<p>Es una prueba de la librería para canvas <a href="http://createjs.com">EaselJS</a>. Los sprites animados son del proyecto. Microsoft XNA Community Game Platformer Sample en la versión de David Rousset - <a href="http://blogs.msdn.com/davrous">blogs.msdn.com/davrous</a></p>
-<br/><br/>
-Log: (First is last)<div id="log" style="border-top: 1px solid #ccc" ></div>
+	<div class="canvasHolder">
+		<canvas id="testCanvas" width="980" height="662" paseowxi="900" paseowy="480" paseowxf="270" style="background-color: #FFFF00;"></canvas>
+	</div>
+	<div class="features">
+		<div class="column">
+		Es una prueba de la librería para HTML5 canvas 2D <a href="http://createjs.com">EaselJS</a>, además para practicar en los distintos patrones de programación javascript<br />
+		Probado en Chrone y en Firefox
+		</div>
+		<div class="column">
+		Los sprites animados son del proyecto. Microsoft XNA Community Game Platformer Sample y los he extraido de la versión de David Rousset - <a href="http://blogs.msdn.com/davrous">blogs.msdn.com/davrous</a>
+		</div>
+		<div class="column">
+		La imagen procede de <a href="http://nos.twnsnd.co/post/69699793933/dat-dyno">New Old Stock </a> una página de <a href="https://twitter.com/twnsndco">Cole Townsend</a> dedicada "Vintage photos from the public archives
+Free of known copyright restrictions".
+		</div>
+		<div style="clear:both;"></div>
+	</div>
+	
+</div>
 
+<div id="develop">
+Log: (First is last)<div id="log" style="border-top: 1px solid #ccc" ></div>
+</div>
 
 </body>
 </html>

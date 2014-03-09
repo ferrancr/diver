@@ -15,7 +15,6 @@ a:hover {
 
 #titular {
 	padding-bottom:1em;
-
 }
 h1 {
 	font-family: Arial,Helvetica,sans-serif;
@@ -24,10 +23,18 @@ h1 {
 	color: #555;
 	text-transform: uppercase;
 }
- p {
+p {
 	font-size: 1.2em;
     margin-top: 0;
     color: #777777;
+}
+div#espera {
+	color: #555;
+	margin:0;
+	padding:0 2em;
+}
+.ocultar {
+	display: none;
 }
 .container {
     margin: 0 auto;
@@ -55,6 +62,8 @@ h1 {
 	<script type="text/javascript">
 	var stage, w, h, contentManager,bitmapF;
 	var actores = [], totalActores=10,zz_count=0, margenActor=0, iper = 0;
+
+/**************************** ACTOR ***********************/
 (function (window) {
 	var monstruos = 0;
 	function Actor(stage,guion, imgMonster,frontal) {
@@ -65,18 +74,22 @@ h1 {
     Actor.prototype.Sprite_initialize = Actor.prototype.initialize;    
 
     Actor.prototype.initialize = function (stage,guion, imgMonster,frontal) {
-		this.velocidad = guion[0].velocidad;
 		var localSpriteSheet = new createjs.SpriteSheet({
 			framerate: 20,
             images: [imgMonster], //image to use
             frames: { width: 64, height: 64, regX: 32, regY: 64 },
             animations: {
-                walk: [0, 9, "walk", this.velocidad[0]],
-                idle: [10, 20, "idle", 1]
+                walk: [0, 9, "walk", guion.animations.walk.velocidad[0]],
+                idle: [10, 20, "idle", 1],
+                lento: {
+					frames: [2,3,4,7,8,9],
+					speed: guion.animations.lento.velocidad[0]
+				}
             }
         });
         this.bucle = 0;
         this.guion = guion;
+        
         this.stage = stage;
         this.activo = false;
 		this.firtsActuacion();        
@@ -98,6 +111,13 @@ h1 {
 		if (this.actuacion.posInicio) {
 			this.setTransform(this.actuacion.posInicio.x,this.actuacion.posInicio.y);
 		}
+		if (this.actuacion.invertir) {
+			this.invertir = this.actuacion.invertir;
+		}
+		if(this.invertir < 0 ) {
+			this.scaleX = -1;
+		}
+		this.velocidad = this.guion.animations[this.actuacion.tipo].velocidad;
 		log(this.name+": Primero: tipo:"+this.actuacion.tipo+"*paso:"+this.estado);
 		return this.activo;
 	};
@@ -109,6 +129,13 @@ h1 {
 			if (this.actuacion.tiempo) {
 				this.actuacion.tiempoRestante = this.actuacion.tiempo;
 			}
+			if (this.actuacion.invertir) {
+				this.invertir = this.actuacion.invertir;
+			}
+			if(this.invertir < 0 ) {
+				this.scaleX = -1;
+			}
+			this.velocidad = this.guion.animations[this.actuacion.tipo].velocidad;
 			log(this.name+": tipo:"+this.actuacion.tipo+"*paso:"+this.estado);
 		} else {
 			this.activo = false;
@@ -120,11 +147,11 @@ h1 {
 			return;
 		}
 		var deltaS = event.delta/1000;
-		var position = this.x-18*this.velocidad[1]*deltaS; // 18 pixels por zancada * 3 zancadas por segungo =(aprox) ancho enemy.
+		var position = this.x-(18*this.velocidad[1]*deltaS*this.invertir); // 18 pixels por zancada * 3 zancadas por segungo =(aprox) ancho enemy.
 		//log("deltaS:"+deltaS+"*X:"+this.x+"*Pos:"+position);
-		if ( this.actuacion.tipo == "walk") {
+		if ( this.actuacion.tipo == "walk" || this.actuacion.tipo == "lento" ) {
 			this.x = position;
-			if ( this.actuacion.posFinal.x >= position ) {
+			if ( (this.actuacion.posFinal.x - position) * this.invertir > 0 ) {
 				this.nextActuacion();
 			}
 		} else if (this.actuacion.tipo == "idle" ) {
@@ -132,37 +159,84 @@ h1 {
 			if ( this.actuacion.tiempoRestante <= 0 ) {
 				this.nextActuacion();
 			}
-		}
+		} 
 	}
 	window.Actor = Actor;
 } (window));
+/**************************** GUIONES ***********************/
 (function (window) {
-	var elCanvas, paseoY,paseoXI,paseoXF;
+	var elCanvas, paseoY,paseoXI,paseoXF,paradas,velocidades;
 	function setRangoGuion(element) {
 		elCanvas = $(element);
 		paseoY = parseInt(elCanvas.getAttribute('paseowy'));
 		paseoXI = parseInt(elCanvas.getAttribute('paseowxi'));
 		paseoXF = parseInt(elCanvas.getAttribute('paseowxf'));
+		paradas = auxParadas(paseoXI,paseoXF);
 		log("rango:"+paseoY+"*"+paseoXI+"*"+paseoXF+"*"+(paseoXI - paseoXF)/2+"*"+((paseoXI - paseoXF)/2+paseoXF)+"*");
 	}
 	function Guion() {
+		this.inicializar();
+	}
+	Guion.prototype.inicializar = function() {
 		this.guion = [
-			{ tipo: "walk", posInicio : { x : paseoXI, y : paseoY},posFinal: {x :((paseoXI-paseoXF)/2)+paseoXF, y: paseoY}, velocidad: [0.5,3]}
-			,{ tipo: "idle", tiempo : 3000 }
+			{ tipo: "walk", posInicio : { x : paseoXI, y : paseoY},posFinal: {x :((paseoXI-paseoXF)/2)+paseoXF, y: paseoY}, invertir: 1}
+			,{ tipo: "idle", tiempo : 3000  }
 			,{ tipo: "walk", posFinal: {x : paseoXF, y: paseoY} }
 		]
+		this.guion.animations = {
+			walk : {velocidad: [0.5,3] },
+			idle : {velocidad: [1,1] },
+			lento : { velocidad: [0.20,1] }
+		}
+	};
+	Guion.prototype.invertir = function() {
+		this.guion[0].posInicio.x = paseoXF;
+		this.guion[2].posFinal.x = paseoXI;
+		this.guion[0].invertir = -1;
+		log("invertir: Incio"+ this.guion[0].posInicio.x+"Final:"+this.guion[2].posFinal.x);
 	}
-	Guion.prototype.getAlterGuion = function(r,velocidad) {
+	Guion.prototype.getAlterGuion = function(r,velocidad,invertir=false) {
 		log("Parada:"+this.guion[0].posFinal.x+"Cal:"+Math.round( ( paseoXI - paseoXF  )/ r +  paseoXF) +"*");
-		this.guion[0].posFinal.x = Math.round( ( paseoXI - paseoXF  )/ r + paseoXF) ;
-		this.guion[0].velocidad = [ velocidad / 6, velocidad];
+		this.guion[0].posFinal.x = paradas[r];
+		this.guion.animations.walk.velocidad = [ velocidad / 6, velocidad];
+		if (invertir) {
+			this.invertir();
+		}
 		return this.guion;
 	}
+	function GCansado() {
+		this.inicializar();
+	}
+	GCansado.prototype = new Guion();
+	GCansado.prototype.inicializar = function() {
+		// FACER: direccion no esta implementado.
+		this.guion = [
+			{ tipo: "walk", posInicio : { x : paseoXI, y : paseoY},posFinal: {x :((paseoXI-paseoXF)/2)+paseoXF, y: paseoY}, velocidad: [0.5,3], invertir: 1}
+			,{ tipo: "idle", tiempo : 3000 }
+			,{ tipo: "lento", posFinal: {x : paseoXF, y: paseoY},velocidad: [1,1]  }
+		]
+		this.guion.animations = {
+			walk : {velocidad: [0.5,3] },
+			idle : {velocidad: [1,1] },
+			lento : { velocidad: [0.1,1] }
+		}
+	}
+	/** Auxiliares **/
+	function auxParadas(punto_i,punto_f) {
+		var i=10, rangos = new Array();
+		var rango = Math.round((punto_i - punto_f)/12);
+		while (i--) {
+			rangos.push(rango*i + punto_f);
+		}
+		return rangos;
+	}
+
 	window.Guion = Guion;
 	window.setRangoGuion = setRangoGuion;
+	window.GCansado = GCansado;
 } (window));
-
-function ContentManager(stage,w,h,back,front,players) {
+/**************************** CONTENT MANAGER ***********************/
+function ContentManager(stage,w,h,back,front,players,handleBack) {
     // Method called back once all elements
     // have been downloaded
     var ondownloadcompleted;
@@ -179,11 +253,11 @@ function ContentManager(stage,w,h,back,front,players) {
 	}
 	
 	this.StartDownload = function () {
-        downloadProgress = new Text("-- %", "bold 14px Arial", "#FFF");
+        downloadProgress = new Text("-- %", "bold 14px Arial", "#444");
         downloadProgress.x = (w / 2) - 50;
         downloadProgress.y = h / 2;
         stage.addChild(downloadProgress);
-        SetDownloadParameters(this.imgBack, back);
+        SetDownloadImgBack(this.imgBack, back);
         SetDownloadParameters(this.imgFront, front);
         for (var i=0; i < l; i++ ) {
 			SetDownloadParameters(this.imgPlayers[i], players[i]);
@@ -212,7 +286,15 @@ function ContentManager(stage,w,h,back,front,players) {
         assetElement.onload = handleElementLoad;
         assetElement.onerror = handleElementError;
     };
-
+    function SetDownloadImgBack(assetElement, url) {
+        assetElement.src = url;
+        assetElement.onload = handleImgBack;
+        assetElement.onerror = handleElementError;
+    };
+	function handleImgBack(e) {
+		handleElementLoad(e)
+		handleBack();
+	}
     // our global handler 
     function handleElementLoad(e) {
         numElementsLoaded++;
@@ -233,7 +315,7 @@ function ContentManager(stage,w,h,back,front,players) {
     }
 
 }
-// --- Proceso
+/**************************** ACTUACIÓN ***********************/
 	function init() {
 		stage = new createjs.Stage("testCanvas");
 		
@@ -248,32 +330,45 @@ function ContentManager(stage,w,h,back,front,players) {
 			"img/MonsterC.png",
 			"img/MonsterD.png",
 		];
-		contentManager = new ContentManager(stage,w,h,back,front,players);
+		contentManager = new ContentManager(stage,w,h,back,front,players,showImgBack);
 		contentManager.StartDownload();
 		contentManager.SetDownloadCompleted(accion);
 	}
-	function accion() {
-		// Fondo y frontal
+	// fondo.
+	function showImgBack() {
 		var bitmap = new createjs.Bitmap(contentManager.imgBack);
 		stage.addChild(bitmap);
+		stage.update();
+	}
+	function accion() {
+		$("espera").className="ocultar";
+		// frontal
 		bitmapF = new createjs.Bitmap(contentManager.imgFront);
 		bitmapF.setTransform(220,391);
 		stage.addChild(bitmapF);
 		createjs.Ticker.timingMode = createjs.Ticker.RAF;
 		setRangoGuion("testCanvas");
 		var guion = new Guion();
-		actores.push(new Actor(stage,guion.getAlterGuion(2,3),contentManager.imgPlayers[0],bitmapF) );
+		actores.push(new Actor(stage,guion.getAlterGuion(5,3,false),contentManager.imgPlayers[0],bitmapF) );
 		createjs.Ticker.addEventListener("tick", tick);
 		setTimeout(nuevo, 2000 * Math.floor((Math.random()*10)+1) );
 	}
 
 	function nuevo() {
+		var act, guion, invertir;
 		var r = Math.floor((Math.random()*4) + 1)+Math.random();
-		var velocidad = Math.round(Math.random()*5)+2 
+		var velocidad = actores.length;
 		iper = (iper + 1) % 4;
-		var guion = new Guion();
-		log("iper:"+iper+"velocidad"+velocidad+"*"+contentManager.imgPlayers[iper].src+"*r:"+r);
-		var act = new Actor(stage,guion.getAlterGuion(r,velocidad),contentManager.imgPlayers[iper],bitmapF); 
+		if ( actores.length == 3 ) {
+			guion = new GCansado();
+			log("iper:"+iper+"*"+contentManager.imgPlayers[iper].src+"*r:"+r);
+			act = new Actor(stage,guion.guion,contentManager.imgPlayers[iper],bitmapF);
+		} else {
+			guion = new Guion();
+			invertir = (actores.length == 4 || actores.length == 8 );
+			log("iper:"+iper+"velocidad"+velocidad+"*"+contentManager.imgPlayers[iper].src+"*r:"+r);
+			act = new Actor(stage,guion.getAlterGuion(actores.length-1,velocidad,invertir),contentManager.imgPlayers[iper],bitmapF); 
+		}
 		actores.push(act);
 		if (actores.length < totalActores ) {
 			setTimeout(nuevo, 1000 * (Math.floor((Math.random()*10)+3) ) );
@@ -312,7 +407,9 @@ function ContentManager(stage,w,h,back,front,players) {
 		<p>O como los monstruos decidieron bajar sus altos niveles de colesterol debido a los malos hábitos alimenticios de sus víctimas.</p>
 	</div>
 	<div class="canvasHolder">
-		<canvas id="testCanvas" width="980" height="662" paseowxi="900" paseowy="480" paseowxf="270" style="background-color: #FFFF00;"></canvas>
+		<div id="espera">Espere que se carge la imagen...</div>
+		<canvas id="testCanvas" width="980" height="662" paseowxi="900" paseowy="480" paseowxf="270" style="background-color: #FFFF00;">
+		</canvas>
 	</div>
 	<div class="features">
 		<div class="column">

@@ -79,11 +79,15 @@ div#espera {
             images: [imgMonster], //image to use
             frames: { width: 64, height: 64, regX: 32, regY: 64 },
             animations: {
-                walk: [0, 9, "walk", guion.animations.walk.velocidad[0]],
-                idle: [10, 20, "idle", 1],
-                lento: {
+                walk: [0, 9, "walk", guion.animations.walk.velocidad[0]]
+                ,idle: [10, 20, "idle", 1]
+                ,lento: {
 					frames: [2,3,4,7,8,9],
 					speed: guion.animations.lento.velocidad[0]
+				}
+				,subir: {
+					frames: [2,3,4,7,8,9],
+					speed : 0.5 // [0.5, 0.5]
 				}
             }
         });
@@ -118,6 +122,8 @@ div#espera {
 			this.scaleX = -1;
 		}
 		this.velocidad = this.guion.animations[this.actuacion.tipo].velocidad;
+		if (this.bucle > 1 )
+			this.gotoAndPlay(this.actuacion.tipo);
 		log(this.name+": Primero: tipo:"+this.actuacion.tipo+"*paso:"+this.estado);
 		return this.activo;
 	};
@@ -125,7 +131,6 @@ div#espera {
 		this.estado += 1;
 		if (this.guion.length > this.estado ) {
 			this.actuacion = this.guion[this.estado];
-			this.gotoAndPlay(this.actuacion.tipo);
 			if (this.actuacion.tiempo) {
 				this.actuacion.tiempoRestante = this.actuacion.tiempo;
 			}
@@ -136,7 +141,8 @@ div#espera {
 				this.scaleX = -1;
 			}
 			this.velocidad = this.guion.animations[this.actuacion.tipo].velocidad;
-			log(this.name+": tipo:"+this.actuacion.tipo+"*paso:"+this.estado);
+			this.gotoAndPlay(this.actuacion.tipo);
+			log(this.name+": tipo:"+this.actuacion.tipo+"*paso:"+this.estado+"velocidad"+this.velocidad[0]+","+this.velocidad[1]);
 		} else {
 			this.activo = false;
 		}
@@ -186,7 +192,7 @@ div#espera {
 		this.guion.animations = {
 			walk : {velocidad: [0.5,3] },
 			idle : {velocidad: [1,1] },
-			lento : { velocidad: [0.20,1] }
+			lento : { velocidad: [0.4,1] }
 		}
 	};
 	Guion.prototype.invertir = function() {
@@ -196,7 +202,7 @@ div#espera {
 		log("invertir: Incio"+ this.guion[0].posInicio.x+"Final:"+this.guion[2].posFinal.x);
 	}
 	Guion.prototype.getAlterGuion = function(r,velocidad,invertir=false) {
-		log("Parada:"+this.guion[0].posFinal.x+"Cal:"+Math.round( ( paseoXI - paseoXF  )/ r +  paseoXF) +"*");
+		log("Parada:"+paradas[r]+"*"+"Velocidad:"+velocidad/6+","+velocidad);
 		this.guion[0].posFinal.x = paradas[r];
 		this.guion.animations.walk.velocidad = [ velocidad / 6, velocidad];
 		if (invertir) {
@@ -209,16 +215,15 @@ div#espera {
 	}
 	GCansado.prototype = new Guion();
 	GCansado.prototype.inicializar = function() {
-		// FACER: direccion no esta implementado.
 		this.guion = [
-			{ tipo: "walk", posInicio : { x : paseoXI, y : paseoY},posFinal: {x :((paseoXI-paseoXF)/2)+paseoXF, y: paseoY}, velocidad: [0.5,3], invertir: 1}
+			{ tipo: "walk", posInicio : { x : paseoXI, y : paseoY},posFinal: {x :paradas[9], y: paseoY}, velocidad: [0.5,3], invertir: 1}
 			,{ tipo: "idle", tiempo : 3000 }
-			,{ tipo: "lento", posFinal: {x : paseoXF, y: paseoY},velocidad: [1,1]  }
+			,{ tipo: "lento", posFinal: {x : paseoXI, y: paseoY}, invertir : -1  }
 		]
 		this.guion.animations = {
 			walk : {velocidad: [0.5,3] },
 			idle : {velocidad: [1,1] },
-			lento : { velocidad: [0.1,1] }
+			lento : { velocidad: [0.3,2] }
 		}
 	}
 	/** Auxiliares **/
@@ -358,10 +363,10 @@ function ContentManager(stage,w,h,back,front,players,handleBack) {
 
 	function nuevo() {
 		var act, guion, invertir;
-		var r = Math.floor((Math.random()*4) + 1)+Math.random();
-		var velocidad = actores.length;
+		var r = actores.length-1;
+		var velocidad = actores.length + 2; // minimo 3;
 		iper = (iper + 1) % 4;
-		if ( actores.length == 3 ) {
+		if ( actores.length == 3 ) {  // actores visibles
 			guion = new GCansado();
 			log("iper:"+iper+"*"+contentManager.imgPlayers[iper].src+"*r:"+r);
 			act = new Actor(stage,guion.guion,contentManager.imgPlayers[iper],bitmapF);
@@ -369,7 +374,7 @@ function ContentManager(stage,w,h,back,front,players,handleBack) {
 			guion = new Guion();
 			invertir = (actores.length == 4 || actores.length == 8 );
 			log("iper:"+iper+"velocidad"+velocidad+"*"+contentManager.imgPlayers[iper].src+"*r:"+r);
-			act = new Actor(stage,guion.getAlterGuion(actores.length-1,velocidad,invertir),contentManager.imgPlayers[iper],bitmapF); 
+			act = new Actor(stage,guion.getAlterGuion(r,velocidad,invertir),contentManager.imgPlayers[iper],bitmapF); 
 		}
 		actores.push(act);
 		if (actores.length < totalActores ) {

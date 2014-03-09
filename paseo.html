@@ -253,10 +253,12 @@ function ContentManager(stage,w,h,back,front,players,handleBack) {
 	}
 	
 	this.StartDownload = function () {
-        downloadProgress = new Text("-- %", "bold 14px Arial", "#444");
-        downloadProgress.x = (w / 2) - 50;
-        downloadProgress.y = h / 2;
+        downloadProgress = new createjs.Text("Downloading 0%", "bold 34px Arial", "#444");
+        downloadProgress.x = (w / 2) - 250;
+        downloadProgress.y = h  / 2;
+        log("text="+downloadProgress.text+"x"+downloadProgress.x+"y"+downloadProgress.y);
         stage.addChild(downloadProgress);
+        stage.update();
         SetDownloadImgBack(this.imgBack, back);
         SetDownloadParameters(this.imgFront, front);
         for (var i=0; i < l; i++ ) {
@@ -331,8 +333,8 @@ function ContentManager(stage,w,h,back,front,players,handleBack) {
 			"img/MonsterD.png",
 		];
 		contentManager = new ContentManager(stage,w,h,back,front,players,showImgBack);
-		contentManager.StartDownload();
 		contentManager.SetDownloadCompleted(accion);
+		contentManager.StartDownload();
 	}
 	// fondo.
 	function showImgBack() {

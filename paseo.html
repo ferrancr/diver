@@ -210,13 +210,13 @@ div#espera {
 		}
 		return this.guion;
 	}
-	function GCansado() {
-		this.inicializar();
+	function GCansado(parada) {
+		this.inicializar(parada);
 	}
 	GCansado.prototype = new Guion();
-	GCansado.prototype.inicializar = function() {
+	GCansado.prototype.inicializar = function(parada) {
 		this.guion = [
-			{ tipo: "walk", posInicio : { x : paseoXI, y : paseoY},posFinal: {x :paradas[9], y: paseoY}, velocidad: [0.5,3], invertir: 1}
+			{ tipo: "walk", posInicio : { x : paseoXI, y : paseoY},posFinal: {x :paradas[parada], y: paseoY}, velocidad: [0.5,3], invertir: 1}
 			,{ tipo: "idle", tiempo : 3000 }
 			,{ tipo: "lento", posFinal: {x : paseoXI, y: paseoY}, invertir : -1  }
 		]
@@ -367,7 +367,7 @@ function ContentManager(stage,w,h,back,front,players,handleBack) {
 		var velocidad = actores.length + 2; // minimo 3;
 		iper = (iper + 1) % 4;
 		if ( actores.length == 3 ) {  // actores visibles
-			guion = new GCansado();
+			guion = new GCansado(3);
 			log("iper:"+iper+"*"+contentManager.imgPlayers[iper].src+"*r:"+r);
 			act = new Actor(stage,guion.guion,contentManager.imgPlayers[iper],bitmapF);
 		} else {

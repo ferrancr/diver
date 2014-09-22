@@ -61,8 +61,87 @@ div#espera {
 	<script src="http://code.createjs.com/easeljs-0.7.1.min.js"></script>
 	<script type="text/javascript">
 	var stage, w, h, contentManager,bitmapF;
-	var actores = [], totalActores=10,zz_count=0, margenActor=0, iper = 0;
+	var actores = [], totalActores=7,zz_count=0, margenActor=0, iper = 0;
 
+/**************************** CONTENT MANAGER ***********************/
+function ContentManager(stage,w,h,back,front,players,handleBack) {
+    // Method called back once all elements
+    // have been downloaded
+    var ondownloadcompleted;
+    // Number of elements to download
+    var NUM_ELEMENTS_TO_DOWNLOAD = 2+players.length;
+    var numElementsLoaded = 0;
+	var downloadProgress;
+	this.imgBack = new Image();
+	this.imgFront = new Image();
+	this.imgPlayers = new Array();
+	var l = players.length;
+	for (var i =0; i < l; i++) {
+		this.imgPlayers[i] = new Image();
+	}
+	
+	this.StartDownload = function (msg) {
+        downloadProgress = $(msg);
+		downloadProgress.innerHTML = "Descarrega 0%";
+        stage.update();
+        SetDownloadImgBack(this.imgBack, back);
+        SetDownloadParameters(this.imgFront, front);
+        for (var i=0; i < l; i++ ) {
+			SetDownloadParameters(this.imgPlayers[i], players[i]);
+		}
+		createjs.Ticker.addEventListener('tick',this.tick);
+		createjs.Ticker.setInterval(50);
+	};
+	
+    // setting the callback method
+    // Triggered once everything is ready to be drawned on the canvas
+    this.SetDownloadCompleted = function (callbackMethod) {
+        ondownloadcompleted = callbackMethod;
+    };
+    
+    // Update methid which simply shows the current % of download
+    this.tick = function() {
+        downloadProgress.innerHTML = "Downloading " + Math.round((numElementsLoaded / NUM_ELEMENTS_TO_DOWNLOAD) * 100) + " %";
+        // update the stage:
+        stage.update();
+    };
+    
+    //---- Inner Fuctions.
+    // Set parameters for Donwload.
+    function SetDownloadParameters(assetElement, url) {
+        assetElement.onload = handleElementLoad;
+        assetElement.onerror = handleElementError;
+        assetElement.src = url;
+    };
+    function SetDownloadImgBack(assetElement, url) {
+        assetElement.onload = handleImgBack;
+        assetElement.onerror = handleElementError;
+        assetElement.src = url;
+    };
+	function handleImgBack(e) {
+		handleElementLoad(e)
+		handleBack();
+	}
+    // our global handler 
+    function handleElementLoad(e) {
+        numElementsLoaded++;
+
+        // If all elements have been downloaded
+        if (numElementsLoaded === NUM_ELEMENTS_TO_DOWNLOAD) {
+            stage.removeChild(downloadProgress);
+            createjs.Ticker.removeAllEventListeners();
+            numElementsLoaded = 0;
+            // we're calling back the method set by SetDownloadCompleted
+            ondownloadcompleted();
+        }
+    }
+
+    //called if there is an error loading the image (usually due to a 404)
+    function handleElementError(e) {
+        log("Error Loading Asset : " + e.target.src);
+    }
+
+}
 /**************************** ACTOR ***********************/
 (function (window) {
 	var monstruos = 0;
@@ -93,7 +172,7 @@ div#espera {
         });
         this.bucle = 0;
         this.guion = guion;
-        
+        this.limitePases = guion.animations.pases || 2;
         this.stage = stage;
         this.activo = false;
 		this.firtsActuacion();        
@@ -104,7 +183,7 @@ div#espera {
 		this.name = "Monstruo_"+monstruos++;
 	};
 	Actor.prototype.firtsActuacion = function () {
-		if (++this.bucle > 3 ) {
+		if (++this.bucle > this.limitePases ) {
 			//this.gotoAndStop(this.spriteSheet.animations.idle[0])
 			this.activo = false;
 			return this.activo;
@@ -166,19 +245,27 @@ div#espera {
 				this.nextActuacion();
 			}
 		} 
-	}
+	};
 	window.Actor = Actor;
 } (window));
 /**************************** GUIONES ***********************/
 (function (window) {
 	var elCanvas, paseoY,paseoXI,paseoXF,paradas,velocidades;
-	function setRangoGuion(element) {
+	function setRangoGuion(element,ordenParadas,ordenVelocidades) {
 		elCanvas = $(element);
 		paseoY = parseInt(elCanvas.getAttribute('paseowy'));
 		paseoXI = parseInt(elCanvas.getAttribute('paseowxi'));
 		paseoXF = parseInt(elCanvas.getAttribute('paseowxf'));
-		paradas = auxParadas(paseoXI,paseoXF);
+		paradas = auxParadas(paseoXI,paseoXF,ordenParadas);
+		velocidades = auxVelocidades(ordenVelocidades);
 		log("rango:"+paseoY+"*"+paseoXI+"*"+paseoXF+"*"+(paseoXI - paseoXF)/2+"*"+((paseoXI - paseoXF)/2+paseoXF)+"*");
+	}
+	function getRangoGuion() {
+		var rango = {};
+		rango.paseoY = paseoY;
+		rango.paseoXI = paseoXI;
+		rango.paseoXF = paseoXF;
+		return rango;
 	}
 	function Guion() {
 		this.inicializar();
@@ -188,28 +275,28 @@ div#espera {
 			{ tipo: "walk", posInicio : { x : paseoXI, y : paseoY},posFinal: {x :((paseoXI-paseoXF)/2)+paseoXF, y: paseoY}, invertir: 1}
 			,{ tipo: "idle", tiempo : 3000  }
 			,{ tipo: "walk", posFinal: {x : paseoXF, y: paseoY} }
-		]
+		];
 		this.guion.animations = {
 			walk : {velocidad: [0.5,3] },
 			idle : {velocidad: [1,1] },
 			lento : { velocidad: [0.4,1] }
-		}
+		};
 	};
 	Guion.prototype.invertir = function() {
 		this.guion[0].posInicio.x = paseoXF;
 		this.guion[2].posFinal.x = paseoXI;
 		this.guion[0].invertir = -1;
 		log("invertir: Incio"+ this.guion[0].posInicio.x+"Final:"+this.guion[2].posFinal.x);
-	}
+	};
 	Guion.prototype.getAlterGuion = function(r,velocidad,invertir) {
-		log("Parada:"+paradas[r]+"*"+"Velocidad:"+velocidad/6+","+velocidad);
+		log("Parada:"+paradas[r]+"*"+"Velocidad:"+velocidades[velocidad][0]+","+velocidades[velocidad][1]);
 		this.guion[0].posFinal.x = paradas[r];
-		this.guion.animations.walk.velocidad = [ velocidad / 6, velocidad];
+		this.guion.animations.walk.velocidad = velocidades[velocidad];
 		if (invertir) {
 			this.invertir();
 		}
 		return this.guion;
-	}
+	};
 	function GCansado(parada) {
 		this.inicializar(parada);
 	}
@@ -218,111 +305,49 @@ div#espera {
 		this.guion = [
 			{ tipo: "walk", posInicio : { x : paseoXI, y : paseoY},posFinal: {x :paradas[parada], y: paseoY}, velocidad: [0.5,3], invertir: 1}
 			,{ tipo: "idle", tiempo : 3000 }
+			,{ tipo: "walk",  posFinal:  {x :paradas[parada]-100, y: paseoY},velocidad: [1.7,9], invertir: 1}
+			,{ tipo: "idle", tiempo : 3000 }
+			,{ tipo: "walk",  posFinal:  {x :paradas[parada]-200, y: paseoY},velocidad: [1.7,9], invertir: 1}
+			,{ tipo: "idle", tiempo : 3000 }
+			,{ tipo: "walk",  posFinal:  {x :paradas[parada]-250, y: paseoY},velocidad: [1.7,9], invertir: 1}
+			,{ tipo: "idle", tiempo : 3000 }
 			,{ tipo: "lento", posFinal: {x : paseoXI, y: paseoY}, invertir : -1  }
 		]
 		this.guion.animations = {
-			walk : {velocidad: [0.5,3] },
+			walk : {velocidad: [1.7,9] },
 			idle : {velocidad: [1,1] },
-			lento : { velocidad: [0.3,2] }
+			lento : { velocidad: [0.3,2] },
+			pases : 1
 		}
 	}
 	/** Auxiliares **/
-	function auxParadas(punto_i,punto_f) {
-		var i=10, rangos = new Array();
-		var rango = Math.round((punto_i - punto_f)/12);
-		while (i--) {
-			rangos.push(rango*i + punto_f);
+	function auxParadas(punto_i,punto_f,orden) {
+		var limit=10, rangos = new Array(), i = orden.length, margen=120;
+		var rango = Math.round((punto_i  - punto_f)/limit);
+		for (i=0; i < orden.length;i++) {
+			if (limit < orden[i] ) { 
+				orden[i] = 10;
+			}
+			rangos.push(rango* orden[i] + punto_f);
 		}
 		return rangos;
 	}
-
+	function auxVelocidades(orden) {
+		var velocidades = [0.5,0.7,0.9,1.1,1.3,1.5,1.7,1.9];
+		var avance = [3,4,5,6,7,8,9,10];
+		var i=0,i2=0,lg=orden.length, rangos= new Array();
+		for (var i=0; i < lg;i++) {
+			i2 = orden[i];
+			rangos.push([velocidades[i2],avance[i2]]);
+		}
+		return rangos;
+	}
 	window.Guion = Guion;
 	window.setRangoGuion = setRangoGuion;
+	window.getRangoGuion = getRangoGuion;
 	window.GCansado = GCansado;
 } (window));
-/**************************** CONTENT MANAGER ***********************/
-function ContentManager(stage,w,h,back,front,players,handleBack) {
-    // Method called back once all elements
-    // have been downloaded
-    var ondownloadcompleted;
-    // Number of elements to download
-    var NUM_ELEMENTS_TO_DOWNLOAD = 2+players.length;
-    var numElementsLoaded = 0;
-	var downloadProgress;
-	this.imgBack = new Image();
-	this.imgFront = new Image();
-	this.imgPlayers = new Array();
-	var l = players.length;
-	for (var i =0; i < l; i++) {
-		this.imgPlayers[i] = new Image();
-	}
-	
-	this.StartDownload = function () {
-        downloadProgress = new createjs.Text("Downloading 0%", "bold 34px Arial", "#444");
-        downloadProgress.x = (w / 2) - 250;
-        downloadProgress.y = h  / 2;
-        log("text="+downloadProgress.text+"x"+downloadProgress.x+"y"+downloadProgress.y);
-        stage.addChild(downloadProgress);
-        stage.update();
-        SetDownloadImgBack(this.imgBack, back);
-        SetDownloadParameters(this.imgFront, front);
-        for (var i=0; i < l; i++ ) {
-			SetDownloadParameters(this.imgPlayers[i], players[i]);
-		}
-		createjs.Ticker.addEventListener('tick',this.tick);
-		createjs.Ticker.setInterval(50);
-	};
-	
-    // setting the callback method
-    // Triggered once everything is ready to be drawned on the canvas
-    this.SetDownloadCompleted = function (callbackMethod) {
-        ondownloadcompleted = callbackMethod;
-    };
-    
-    // Update methid which simply shows the current % of download
-    this.tick = function() {
-        downloadProgress.text = "Downloading " + Math.round((numElementsLoaded / NUM_ELEMENTS_TO_DOWNLOAD) * 100) + " %";
-        // update the stage:
-        stage.update();
-    };
-    
-    //---- Inner Fuctions.
-    // Set parameters for Donwload.
-    function SetDownloadParameters(assetElement, url) {
-        assetElement.onload = handleElementLoad;
-        assetElement.onerror = handleElementError;
-        assetElement.src = url;
 
-    };
-    function SetDownloadImgBack(assetElement, url) {
-        assetElement.onload = handleImgBack;
-        assetElement.onerror = handleElementError;
-        assetElement.src = url;
-    };
-	function handleImgBack(e) {
-		handleElementLoad(e)
-		handleBack();
-	}
-    // our global handler 
-    function handleElementLoad(e) {
-        numElementsLoaded++;
-
-        // If all elements have been downloaded
-        if (numElementsLoaded === NUM_ELEMENTS_TO_DOWNLOAD) {
-            stage.removeChild(downloadProgress);
-            createjs.Ticker.removeAllEventListeners();
-            numElementsLoaded = 0;
-            // we're calling back the method set by SetDownloadCompleted
-            ondownloadcompleted();
-        }
-    }
-
-    //called if there is an error loading the image (usually due to a 404)
-    function handleElementError(e) {
-        log("Error Loading Asset : " + e.target.src);
-    }
-
-}
 /**************************** ACTUACIÓN ***********************/
 	function init() {
 		stage = new createjs.Stage("testCanvas");
@@ -340,7 +365,7 @@ function ContentManager(stage,w,h,back,front,players,handleBack) {
 		];
 		contentManager = new ContentManager(stage,w,h,back,front,players,showImgBack);
 		contentManager.SetDownloadCompleted(accion);
-		contentManager.StartDownload();
+		contentManager.StartDownload("carreguem");
 	}
 	// fondo.
 	function showImgBack() {
@@ -355,32 +380,42 @@ function ContentManager(stage,w,h,back,front,players,handleBack) {
 		bitmapF.setTransform(220,391);
 		stage.addChild(bitmapF);
 		createjs.Ticker.timingMode = createjs.Ticker.RAF;
-		setRangoGuion("testCanvas");
+		//setRangoGuion("testCanvas",[4,3,2,3,4,5,6,7,8,1],[0,0,1,0,7,2,2,3,1,7]);
+		setRangoGuion("testCanvas",[4,3,1,2,4,5,6],[0,0,6,1,7,0,7]);
 		var guion = new Guion();
-		actores.push(new Actor(stage,guion.getAlterGuion(5,3,false),contentManager.imgPlayers[0],bitmapF) );
+		actores.push(new Actor(stage,guion.getAlterGuion(0,0,false),contentManager.imgPlayers[0],bitmapF) );
 		createjs.Ticker.addEventListener("tick", tick);
 		setTimeout(nuevo, 2000 * Math.floor((Math.random()*10)+1) );
 	}
 
 	function nuevo() {
 		var act, guion, invertir;
-		var r = actores.length-1;
-		var velocidad = actores.length + 2; // minimo 3;
+		var r = actores.length;
+		var velocidad = r; // minimo 3;
 		iper = (iper + 1) % 4;
-		if ( actores.length == 3 ) {  // actores visibles
-			guion = new GCansado(3);
+		if ( actores.length == 6 ) {  // actores visibles
+			guion = new GCansado(6);
 			log("iper:"+iper+"*"+contentManager.imgPlayers[iper].src+"*r:"+r);
 			act = new Actor(stage,guion.guion,contentManager.imgPlayers[iper],bitmapF);
 		} else {
 			guion = new Guion();
-			invertir = (actores.length == 4 || actores.length == 8 );
+			invertir = ( actores.length == 5 ); 
 			log("iper:"+iper+"velocidad"+velocidad+"*"+contentManager.imgPlayers[iper].src+"*r:"+r);
 			act = new Actor(stage,guion.getAlterGuion(r,velocidad,invertir),contentManager.imgPlayers[iper],bitmapF); 
+			if (invertir == true) act.limitePases = 1;
 		}
 		actores.push(act);
 		if (actores.length < totalActores ) {
 			setTimeout(nuevo, 1000 * (Math.floor((Math.random()*10)+3) ) );
 		}
+	}
+	function finalizado(event) {
+		var rango = getRangoGuion();
+		var fin = new createjs.Text("FIN", "bold 34px Arial", "#ff4477");
+		fin.y = rango.paseoY - 30;
+		fin.x = rango.paseoXF + ( (rango.paseoXI - rango.paseoXF) / 4 );
+		stage.addChild(fin);
+		stage.update(event);
 	}
 	function tick(event) {
 		var tot = actores.length;
@@ -397,6 +432,7 @@ function ContentManager(stage,w,h,back,front,players,handleBack) {
 			}
 		}
 		if ( ! activos )  {
+			finalizado(event);
 			createjs.Ticker.off("tick",tick);
 			log("Out");
 			return;
@@ -411,11 +447,11 @@ function ContentManager(stage,w,h,back,front,players,handleBack) {
 <body onload="init();">
 <div class="container">
 	<div it="titular">
-		<h1>La ruta del colesterol</h1>
+		<h1>La ruta del colesterol </h1>
 		<p>O como los monstruos decidieron bajar sus altos niveles de colesterol debido a los malos hábitos alimenticios de sus víctimas.</p>
 	</div>
 	<div class="canvasHolder">
-		<div id="espera">Espere que se carge la imagen...</div>
+		<div id="espera">Espere que se carge la imagen...<span id="carreguem"></span></div>
 		<canvas id="testCanvas" width="980" height="662" paseowxi="900" paseowy="480" paseowxf="270" style="background-color: #FFFF00;">
 		</canvas>
 	</div>

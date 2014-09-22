@@ -289,14 +289,15 @@ function ContentManager(stage,w,h,back,front,players,handleBack) {
     //---- Inner Fuctions.
     // Set parameters for Donwload.
     function SetDownloadParameters(assetElement, url) {
-        assetElement.src = url;
         assetElement.onload = handleElementLoad;
         assetElement.onerror = handleElementError;
+        assetElement.src = url;
+
     };
     function SetDownloadImgBack(assetElement, url) {
-        assetElement.src = url;
         assetElement.onload = handleImgBack;
         assetElement.onerror = handleElementError;
+        assetElement.src = url;
     };
 	function handleImgBack(e) {
 		handleElementLoad(e)

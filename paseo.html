@@ -201,7 +201,7 @@ div#espera {
 		this.guion[0].invertir = -1;
 		log("invertir: Incio"+ this.guion[0].posInicio.x+"Final:"+this.guion[2].posFinal.x);
 	}
-	Guion.prototype.getAlterGuion = function(r,velocidad,invertir=false) {
+	Guion.prototype.getAlterGuion = function(r,velocidad,invertir) {
 		log("Parada:"+paradas[r]+"*"+"Velocidad:"+velocidad/6+","+velocidad);
 		this.guion[0].posFinal.x = paradas[r];
 		this.guion.animations.walk.velocidad = [ velocidad / 6, velocidad];
